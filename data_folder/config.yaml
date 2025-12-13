@@ -24,10 +24,14 @@ date:
   24 hours: true
 
 positions:
-  - Software engineer
+  - IT
+  - Computer Science
+  - Web Design
+  - Full Stack Developer
 
 locations:
-  - Germany
+  - Afghanistan
+  - Kabul
 
 apply_once_at_company: true
 
@@ -47,4 +51,3 @@ job_applicants_threshold:
 
 llm_model_type: openai
 llm_model: 'gpt-4o-mini'
-# llm_api_url: https://api.pawan.krd/cosmosrp/v1'
