@@ -1,0 +1,14 @@
+
+services:
+  - type: web
+    name: aihawk-job-assistant
+    env: docker
+    plan: free
+    branch: main
+    repo: https://github.com/feder-cr/Auto_Jobs_Applier_AIHawk # Note: User should replace this with their repo if it's a fork
+    healthCheckPath: /_stcore/health
+    envVars:
+      - key: HEADLESS_MODE
+        value: true
+      - key: PYTHONUNBUFFERED
+        value: 1

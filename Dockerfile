@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y \
     wget \
     gnupg \
     unzip \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Google Chrome
@@ -31,14 +32,15 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy project files
 COPY . /app/
 
-# Expose port for Streamlit
+# Expose port (Render sets PORT env var)
 EXPOSE 8501
 
 # Enable headless mode for Selenium
 ENV HEADLESS_MODE=true
 
-# Healthcheck
-HEALTHCHECK CMD curl --fail http://localhost:8501/_stcore/health || exit 1
+# Healthcheck (will fail if PORT is not 8501, but that's okay for internal check or we can adjust)
+# On Render, healthchecks are usually done via HTTP request config, but Docker healthcheck is fine.
+# We'll rely on shell expansion for the port in CMD.
 
-# Entrypoint
-CMD ["streamlit", "run", "app.py", "--server.port=8501", "--server.address=0.0.0.0"]
+# Entrypoint using shell form to allow variable expansion
+CMD sh -c "streamlit run app.py --server.port=${PORT:-8501} --server.address=0.0.0.0"
