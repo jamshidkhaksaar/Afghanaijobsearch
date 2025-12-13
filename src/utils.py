@@ -133,6 +133,10 @@ def chrome_browser_options():
     options.add_argument("--disable-plugins")
     options.add_argument("--disable-animations")
     options.add_argument("--disable-cache")
+    # Added for Docker compatibility
+    if os.environ.get("HEADLESS_MODE", "false").lower() == "true":
+        options.add_argument("--headless=new")
+
     options.add_experimental_option("excludeSwitches", ["enable-automation", "enable-logging"])
 
     prefs = {

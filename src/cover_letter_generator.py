@@ -1,5 +1,4 @@
 
-from langchain_core.prompts import PromptTemplate
 from src.llm.llm_manager import AIAdapter
 from loguru import logger
 import yaml

@@ -3,6 +3,7 @@ import streamlit as st
 import yaml
 import os
 import shutil
+import time
 from pathlib import Path
 from src.cv_parser import CVParser
 from src.cover_letter_generator import CoverLetterGenerator
@@ -214,34 +215,30 @@ with tab_portal:
         else:
             status_text = st.empty()
             status_text.info("Initializing Agent...")
-
+            driver = None
             try:
                 # Load Resume Data
                 with open(RESUME_FILE, "r") as f:
                     resume_data = yaml.safe_load(f)
 
-                # Flatten Data (Logic copied/adapted from agentic_main.py)
+                # Flatten Data
                 flat_resume_data = {}
-                # Personal Info
                 if 'personal_information' in resume_data:
                     for k, v in resume_data['personal_information'].items():
                         flat_resume_data[f"personal_information.{k}"] = v
 
-                # Education
                 if 'education_details' in resume_data and isinstance(resume_data['education_details'], list) and len(resume_data['education_details']) > 0:
                     edu = resume_data['education_details'][0]
                     for k, v in edu.items():
                         if isinstance(v, (str, int, float)):
                             flat_resume_data[f"education.{k}"] = v
 
-                # Experience
                 if 'experience_details' in resume_data and isinstance(resume_data['experience_details'], list) and len(resume_data['experience_details']) > 0:
                     exp = resume_data['experience_details'][0]
                     for k, v in exp.items():
                         if isinstance(v, (str, int, float)):
                             flat_resume_data[f"experience.{k}"] = v
 
-                # Projects
                 if 'projects' in resume_data and isinstance(resume_data['projects'], list) and len(resume_data['projects']) > 0:
                      proj = resume_data['projects'][0]
                      for k, v in proj.items():
@@ -257,12 +254,46 @@ with tab_portal:
                 status_text.info(f"Launching browser for {portal_url}...")
 
                 adapter = get_ai_adapter(api_key)
-                driver = init_browser() # This comes from main.py
+                driver = init_browser()
                 applier = GenericPortalApplier(driver, adapter, flat_resume_data)
 
                 applier.apply(portal_url)
 
-                status_text.success("Agent finished processing the page(s). Please check the browser window to verify and submit.")
+                # Check for headless
+                is_headless = os.environ.get("HEADLESS_MODE", "false").lower() == "true"
+
+                if is_headless:
+                    # Take screenshot for verification
+                    screenshot_path = DATA_FOLDER / "portal_screenshot.png"
+                    driver.save_screenshot(str(screenshot_path))
+                    st.image(str(screenshot_path), caption="Application State (Headless)")
+                    status_text.success("Application process finished (Headless). Check screenshot above.")
+                else:
+                    status_text.success("Agent finished processing. Please check the browser window.")
 
             except Exception as e:
                 status_text.error(f"Agent failed: {e}")
+            finally:
+                if driver:
+                    if os.environ.get("HEADLESS_MODE", "false").lower() == "true":
+                        driver.quit()
+                    else:
+                        # In desktop mode, maybe user wants to see it?
+                        # But for safety/resource, we should probably close it eventually, or let user close it.
+                        # For now, let's close it to prevent leaks, maybe after a delay or just close it.
+                        # The user prompt said "browser will remain open".
+                        # But we must avoid leaks.
+                        # Let's rely on Streamlit session? No.
+                        # We'll just not close it in non-headless mode for now, BUT warn user.
+                        # Or better: offer a "Close Browser" button? No, Streamlit execution ends.
+                        # So we MUST close it, otherwise it leaks.
+                        # Actually, if we close it immediately, the user can't "verify and submit".
+                        # This is a dilemma with Streamlit + Local Browser.
+                        # If headless (Docker), we MUST close it.
+                        # If local, we can leave it open, but the python process detaches.
+                        pass
+
+                    # For this PR, I will enforce close in Headless, and leave open in Local (with risk),
+                    # OR just close it after a long sleep?
+                    # Let's close it in headless.
+                    pass

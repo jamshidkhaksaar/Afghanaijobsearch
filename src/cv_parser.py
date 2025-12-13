@@ -1,7 +1,6 @@
 
 import yaml
 import os
-from langchain_core.prompts import PromptTemplate
 from pdfminer.high_level import extract_text
 from src.llm.llm_manager import AIAdapter
 from loguru import logger
@@ -27,11 +26,15 @@ class CVParser:
         # Load the example structure to guide the LLM
         example_structure = ""
         try:
-            with open("data_folder_example/plain_text_resume.yaml", "r") as f:
-                example_structure = f.read()
+            # Try main data folder first, then example
+            if os.path.exists("data_folder/plain_text_resume.yaml"):
+                 with open("data_folder/plain_text_resume.yaml", "r") as f:
+                    example_structure = f.read()
+            elif os.path.exists("data_folder_example/plain_text_resume.yaml"):
+                with open("data_folder_example/plain_text_resume.yaml", "r") as f:
+                    example_structure = f.read()
         except Exception as e:
             logger.warning(f"Could not load example structure: {e}")
-            # Fallback prompt logic if needed, but for now rely on the example file being present
 
         prompt = f"""
             You are an expert resume parser. I will provide you with the raw text of a resume and an example YAML structure.

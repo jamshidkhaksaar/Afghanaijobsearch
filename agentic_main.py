@@ -107,39 +107,34 @@ def main(action, cv_path, job_description, recruiter_email, gmail_user, gmail_pa
         if not portal_url:
             portal_url = click.prompt("Please enter the job portal URL")
 
+        driver = None
         try:
             with open(plain_text_resume_file, "r") as f:
                 resume_data = yaml.safe_load(f)
 
             # Flatten resume data for easier mapping
             flat_resume_data = {}
-
-            # Personal Info
             if 'personal_information' in resume_data:
                 for k, v in resume_data['personal_information'].items():
                     flat_resume_data[f"personal_information.{k}"] = v
 
-            # Education (just taking the most recent/first one for simplicity in flat mapping)
             if 'education_details' in resume_data and isinstance(resume_data['education_details'], list) and len(resume_data['education_details']) > 0:
                 edu = resume_data['education_details'][0]
                 for k, v in edu.items():
                     if isinstance(v, (str, int, float)):
                         flat_resume_data[f"education.{k}"] = v
 
-            # Experience (most recent)
             if 'experience_details' in resume_data and isinstance(resume_data['experience_details'], list) and len(resume_data['experience_details']) > 0:
                 exp = resume_data['experience_details'][0]
                 for k, v in exp.items():
                     if isinstance(v, (str, int, float)):
                         flat_resume_data[f"experience.{k}"] = v
 
-            # Projects
             if 'projects' in resume_data and isinstance(resume_data['projects'], list) and len(resume_data['projects']) > 0:
                  proj = resume_data['projects'][0]
                  for k, v in proj.items():
                      flat_resume_data[f"project.{k}"] = v
 
-            # Skills/Languages/Interests (often lists)
             if 'languages' in resume_data:
                 flat_resume_data['languages'] = ", ".join([l.get('language', '') for l in resume_data['languages']])
 
@@ -154,6 +149,9 @@ def main(action, cv_path, job_description, recruiter_email, gmail_user, gmail_pa
             input("Press Enter to close browser...")
         except Exception as e:
             click.echo(f"Error applying to portal: {e}")
+        finally:
+            if driver:
+                driver.quit()
 
 if __name__ == '__main__':
     main()
