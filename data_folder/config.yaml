@@ -1,5 +1,4 @@
 remote: true
-
 experienceLevel:
   internship: false
   entry: true
@@ -7,7 +6,6 @@ experienceLevel:
   mid-senior level: true
   director: false
   executive: false
-
 jobTypes:
   full-time: true
   contract: false
@@ -16,38 +14,29 @@ jobTypes:
   internship: false
   other: false
   volunteer: true
-
 date:
   all time: false
   month: false
   week: false
   24 hours: true
-
 positions:
-  - IT
-  - Computer Science
-  - Web Design
-  - Full Stack Developer
-
+- IT
+- Computer Science
+- Web Design
+- Full Stack Developer
 locations:
-  - Afghanistan
-  - Kabul
-
+- Afghanistan
+- Kabul
 apply_once_at_company: true
-
 distance: 100
-
 company_blacklist:
-  - wayfair
-  - Crossover
-
+- wayfair
+- Crossover
 title_blacklist:
-  - word1
-  - word2
-
+- word1
+- word2
 job_applicants_threshold:
   min_applicants: 0
   max_applicants: 30
-
-llm_model_type: openai
-llm_model: 'gpt-4o-mini'
+llm_model_type: gemini
+llm_model: gemini-2.5-flash
