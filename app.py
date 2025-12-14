@@ -34,19 +34,34 @@ def load_secrets():
             return yaml.safe_load(f) or {}
     return {}
 
-def save_secrets(api_key):
+def save_secrets(api_key_field: str, api_key: str, update_legacy_llm_api_key: bool = True):
+    existing = load_secrets()
+    existing[api_key_field] = api_key
+    if update_legacy_llm_api_key:
+        existing["llm_api_key"] = api_key
     with open(SECRETS_FILE, 'w') as f:
-        yaml.dump({"llm_api_key": api_key}, f)
+        yaml.safe_dump(existing, f, sort_keys=False)
+
+def save_secrets_for_model_type(llm_model_type: str, api_key: str, update_legacy_llm_api_key: bool = True):
+    primary_key_field = ConfigValidator.primary_api_key_field(llm_model_type)
+    save_secrets(primary_key_field, api_key, update_legacy_llm_api_key=update_legacy_llm_api_key)
+
+def load_config():
+    if CONFIG_FILE.exists():
+        with open(CONFIG_FILE, 'r') as f:
+            return yaml.safe_load(f) or {}
+    return {'llm_model_type': 'openai', 'llm_model': 'gpt-4o-mini'}
+
+def save_config(updated: dict):
+    existing = load_config()
+    existing.update(updated)
+    with open(CONFIG_FILE, "w") as f:
+        yaml.safe_dump(existing, f, sort_keys=False)
 
 def get_ai_adapter(api_key):
     try:
         # Load config to get model type
-        if CONFIG_FILE.exists():
-            with open(CONFIG_FILE, 'r') as f:
-                config = yaml.safe_load(f)
-        else:
-            # Default fallback
-            config = {'llm_model_type': 'openai', 'llm_model': 'gpt-4o-mini'}
+        config = load_config()
 
         return AIAdapter(config, api_key)
     except Exception as e:
@@ -61,15 +76,71 @@ st.title("🦅 AIHawk: Agentic Job Application Assistant")
 with st.sidebar:
     st.header("⚙️ Configuration")
 
+    st.subheader("LLM Settings")
+    config = load_config()
+    llm_model_type = (config.get("llm_model_type") or "openai").strip().lower()
+    llm_model = (config.get("llm_model") or "").strip()
+
+    llm_model_type_options = ["openai", "gemini", "claude", "ollama", "huggingface"]
+    selected_llm_model_type = st.selectbox(
+        "LLM Provider",
+        llm_model_type_options,
+        index=llm_model_type_options.index(llm_model_type) if llm_model_type in llm_model_type_options else 0,
+        help="This controls which API key is used for requests.",
+    )
+    selected_llm_model = st.text_input(
+        "Model Name",
+        value=llm_model or ("gpt-4o-mini" if selected_llm_model_type == "openai" else ""),
+        help="Example: openai=gpt-4o-mini, gemini=gemini-1.5-flash",
+    )
+    if selected_llm_model_type != llm_model_type or selected_llm_model != llm_model:
+        save_config({"llm_model_type": selected_llm_model_type, "llm_model": selected_llm_model})
+        st.success("LLM settings saved!")
+        config = load_config()
+        llm_model_type = (config.get("llm_model_type") or "openai").strip().lower()
+
+    st.divider()
+
     # API Key Management
     secrets = load_secrets()
-    api_key = secrets.get('llm_api_key', '')
+    api_key = ConfigValidator.resolve_api_key(secrets, llm_model_type)
 
-    new_api_key = st.text_input("OpenAI API Key", value=api_key, type="password")
-    if new_api_key != api_key:
-        save_secrets(new_api_key)
+    provider_options = ["openai", "gemini", "claude", "huggingface", "ollama", "legacy"]
+    provider_default = llm_model_type if llm_model_type in provider_options else "legacy"
+    provider_for_key = st.selectbox(
+        "API Key Provider",
+        provider_options,
+        index=provider_options.index(provider_default),
+        help="Select which provider key to edit in data_folder/secrets.yaml.",
+    )
+
+    label_by_provider = {
+        "openai": "OpenAI API Key",
+        "gemini": "Gemini API Key",
+        "claude": "Anthropic (Claude) API Key",
+        "huggingface": "Hugging Face API Key",
+        "ollama": "API Key (not required for Ollama)",
+        "legacy": "Legacy API Key (llm_api_key)",
+    }
+
+    api_key_field = "llm_api_key" if provider_for_key == "legacy" else ConfigValidator.primary_api_key_field(provider_for_key)
+    current_value = secrets.get(api_key_field, "") if isinstance(secrets, dict) else ""
+    update_legacy = False
+    if provider_for_key != "legacy":
+        update_legacy = st.checkbox("Also update llm_api_key fallback", value=(provider_for_key == llm_model_type))
+        if provider_for_key != llm_model_type and update_legacy:
+            st.warning("Your current LLM Provider is different; updating llm_api_key may cause key mixups.")
+
+    new_api_key = st.text_input(label_by_provider.get(provider_for_key, "LLM API Key"), value=current_value, type="password")
+    if new_api_key != current_value:
+        if provider_for_key == "legacy":
+            save_secrets("llm_api_key", new_api_key, update_legacy_llm_api_key=False)
+        else:
+            save_secrets(api_key_field, new_api_key, update_legacy_llm_api_key=update_legacy)
         st.success("API Key saved!")
-        api_key = new_api_key
+        # Refresh effective key used by the app (based on config llm_model_type)
+        secrets = load_secrets()
+        api_key = ConfigValidator.resolve_api_key(secrets, llm_model_type)
 
     st.divider()
 
@@ -80,6 +151,7 @@ with st.sidebar:
             config = yaml.safe_load(f)
             st.write(f"**Locations:** {', '.join(config.get('locations', []))}")
             st.write(f"**Positions:** {', '.join(config.get('positions', []))}")
+            st.write(f"**LLM:** {config.get('llm_model_type', 'openai')} ({config.get('llm_model', '')})")
     else:
         st.warning("Config file not found.")
 

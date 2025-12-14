@@ -153,13 +153,30 @@ Auto_Jobs_Applier_AIHawk steps in as a game-changing solution to these challenge
    pip install -r requirements.txt
    ```
 
+### Docker (recommended)
+
+1. Ensure `data_folder/` contains your runtime files (at minimum `config.yaml`, `plain_text_resume.yaml`, and `secrets.yaml`).
+2. Build and run:
+   ```bash
+   docker compose up --build
+   ```
+3. Open the UI at `http://localhost:8501`.
+
+If you get `permission denied` on `/var/run/docker.sock`, run with `sudo docker compose ...` or add your user to the `docker` group and re-login.
+
 ## Configuration
 
 ### 1. secrets.yaml
 
 This file contains sensitive information. Never share or commit this file to version control.
 
-- `llm_api_key: [Your OpenAI or Ollama API key or Gemini API key]`
+- Provider-specific keys (recommended):
+  - `openai_api_key: [Your OpenAI API key]`
+  - `gemini_api_key: [Your Gemini API key]`
+  - `anthropic_api_key: [Your Anthropic (Claude) API key]`
+- Backwards compatibility:
+  - `llm_api_key: [Your LLM API key]` (used if the provider-specific key is not set)
+  - For Ollama, no API key is required.
   - Replace with your OpenAI API key for GPT integration
   - To obtain an API key, follow the tutorial at: https://medium.com/@lorenzozar/how-to-get-your-own-openai-api-key-f4d44e60c327
   - Note: You need to add credit to your OpenAI account to use the API. You can add credit by visiting the [OpenAI billing dashboard](https://platform.openai.com/account/billing).

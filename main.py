@@ -25,6 +25,38 @@ class ConfigError(Exception):
 
 class ConfigValidator:
     @staticmethod
+    def primary_api_key_field(llm_model_type: str) -> str:
+        llm_model_type = (llm_model_type or "").strip().lower()
+        if llm_model_type == "openai":
+            return "openai_api_key"
+        if llm_model_type == "gemini":
+            return "gemini_api_key"
+        if llm_model_type == "claude":
+            return "anthropic_api_key"
+        if llm_model_type == "huggingface":
+            return "huggingface_api_key"
+        return "llm_api_key"
+
+    @staticmethod
+    def resolve_api_key(secrets: dict, llm_model_type: str | None) -> str:
+        llm_model_type = (llm_model_type or "").strip().lower()
+
+        key_candidates_by_type = {
+            "openai": ["openai_api_key", "llm_api_key"],
+            "gemini": ["gemini_api_key", "google_api_key", "llm_api_key"],
+            "claude": ["anthropic_api_key", "claude_api_key", "llm_api_key"],
+            "huggingface": ["huggingface_api_key", "hf_api_key", "llm_api_key"],
+            # Ollama does not require an API key; keep fallback for backwards compatibility.
+            "ollama": ["ollama_api_key", "llm_api_key"],
+        }
+
+        candidates = key_candidates_by_type.get(llm_model_type, ["llm_api_key"])
+        for key in candidates:
+            value = secrets.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+        return ""
+    @staticmethod
     def validate_email(email: str) -> bool:
         return re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', email) is not None
     
@@ -102,17 +134,23 @@ class ConfigValidator:
 
 
     @staticmethod
-    def validate_secrets(secrets_yaml_path: Path) -> tuple:
+    def validate_secrets(secrets_yaml_path: Path, llm_model_type: str | None = None) -> str:
         secrets = ConfigValidator.validate_yaml_file(secrets_yaml_path)
-        mandatory_secrets = ['llm_api_key']
+        llm_model_type_normalized = (llm_model_type or "").strip().lower()
 
-        for secret in mandatory_secrets:
-            if secret not in secrets:
-                raise ConfigError(f"Missing secret '{secret}' in file {secrets_yaml_path}")
+        api_key = ConfigValidator.resolve_api_key(secrets, llm_model_type_normalized)
 
-        if not secrets['llm_api_key']:
-            raise ConfigError(f"llm_api_key cannot be empty in secrets file {secrets_yaml_path}.")
-        return secrets['llm_api_key']
+        if llm_model_type_normalized == "ollama":
+            return api_key
+
+        if not api_key:
+            primary_key_field = ConfigValidator.primary_api_key_field(llm_model_type_normalized)
+            raise ConfigError(
+                f"Missing/empty API key for llm_model_type='{llm_model_type_normalized or 'unknown'}' in {secrets_yaml_path}. "
+                f"Set '{primary_key_field}' (or 'llm_api_key' for backwards compatibility)."
+            )
+
+        return api_key
 
 class FileManager:
     @staticmethod
@@ -195,7 +233,7 @@ def main(resume: Path = None):
         secrets_file, config_file, plain_text_resume_file, output_folder = FileManager.validate_data_folder(data_folder)
         
         parameters = ConfigValidator.validate_config(config_file)
-        llm_api_key = ConfigValidator.validate_secrets(secrets_file)
+        llm_api_key = ConfigValidator.validate_secrets(secrets_file, parameters.get("llm_model_type"))
         
         parameters['uploads'] = FileManager.file_paths_to_dict(resume, plain_text_resume_file)
         parameters['outputFileDirectory'] = output_folder

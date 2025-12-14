@@ -26,19 +26,26 @@ def main(action, cv_path, job_description, recruiter_email, gmail_user, gmail_pa
     # Initialize LLM
     try:
         data_folder = Path("data_folder")
-        # Handle missing secrets file gracefully
-        secrets_file = data_folder / "secrets.yaml"
-        if not secrets_file.exists():
-            click.echo("data_folder/secrets.yaml not found.")
-            api_key = click.prompt("Please enter your LLM API Key", hide_input=True)
-            # Create the file
-            with open(secrets_file, "w") as f:
-                yaml.dump({"llm_api_key": api_key}, f)
-            click.echo("Saved API key to data_folder/secrets.yaml")
-
         secrets_file, config_file, plain_text_resume_file, _ = FileManager.validate_data_folder(data_folder)
         parameters = ConfigValidator.validate_config(config_file)
-        llm_api_key = ConfigValidator.validate_secrets(secrets_file)
+
+        # Handle missing/empty key gracefully
+        try:
+            llm_api_key = ConfigValidator.validate_secrets(secrets_file, parameters.get("llm_model_type"))
+        except Exception:
+            click.echo("data_folder/secrets.yaml is missing or does not contain a valid API key for your selected llm_model_type.")
+            api_key = click.prompt("Please enter your LLM API Key", hide_input=True)
+            primary_key_field = ConfigValidator.primary_api_key_field(parameters.get("llm_model_type", ""))
+            existing = {}
+            if secrets_file.exists():
+                with open(secrets_file, "r") as f:
+                    existing = yaml.safe_load(f) or {}
+            existing[primary_key_field] = api_key
+            existing["llm_api_key"] = api_key
+            with open(secrets_file, "w") as f:
+                yaml.safe_dump(existing, f, sort_keys=False)
+            click.echo(f"Saved API key to data_folder/secrets.yaml ({primary_key_field} and llm_api_key).")
+            llm_api_key = api_key
 
         ai_adapter = AIAdapter(parameters, llm_api_key)
     except Exception as e:

@@ -1,12 +1,13 @@
 
-version: '3.8'
-
 services:
   aihawk-app:
     build: .
     ports:
-      - "8501:8501"
+      - "${PORT:-8501}:${PORT:-8501}"
     volumes:
       - ./data_folder:/app/data_folder
     environment:
       - PYTHONUNBUFFERED=1
+      - PORT=${PORT:-8501}
+    shm_size: "1gb"
+    restart: unless-stopped
